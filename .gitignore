@@ -1,0 +1,10 @@
+# 临时打包产物
+deploy.tar.gz
+*.tar.gz
+
+# 个人文档（不入库）
+memory.md
+learning_path.md
+obsidian_guide.md
+summer_plan.md
+阿里云部署教程.md
