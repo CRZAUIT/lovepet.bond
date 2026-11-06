@@ -1,0 +1,13 @@
+{
+  "name": "miaochain-mvp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "喵链 MVP 服务",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server-dev.js"
+  },
+  "dependencies": {
+    "ethers": "^6.13.0"
+  }
+}

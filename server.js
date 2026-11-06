@@ -6,8 +6,7 @@
  *   2. 转发 RPC 请求到 Polygon Amoy
  *   3. 80 端口自动跳转到 HTTPS
  *
- * 使用方式：node server.js
- * 不需要安装任何依赖，Node.js 内置模块就够了。
+ * 使用方式：npm install && node server.js
  * 证书文件（www.lovepet.bond.pem / www.lovepet.bond.key）须与本文件同目录。
  */
 
@@ -20,6 +19,48 @@ const crypto = require('crypto');
 const HTTP_PORT = 80;
 const HTTPS_PORT = 443;
 const RPC_HOST = 'polygon-amoy.drpc.org';
+
+// 链上帮助记录（只读，供网站与小程序接口使用）
+const CONTRACT_ADDRESS = '0x599A197C8cF59B36CB2a138C74C5b1ed5c6141dF';
+const HELP_ABI = [
+  'function getHelpCount() view returns (uint256)',
+  'function getHelps(uint256 _offset, uint256 _limit) view returns (tuple(string helperName, string catId, string action, string message, string proofHash, uint256 timestamp)[] memory)',
+];
+const HELP_CACHE_MS = 30 * 1000;
+const HELP_MAX = 200;
+let ethersLib = null;
+let helpsCache = { at: 0, data: null, total: 0 };
+
+function getEthers() {
+  if (!ethersLib) ethersLib = require('ethers');
+  return ethersLib;
+}
+
+async function readHelps() {
+  const now = Date.now();
+  if (helpsCache.data && now - helpsCache.at < HELP_CACHE_MS) return helpsCache;
+
+  const { JsonRpcProvider, Contract } = getEthers();
+  const provider = new JsonRpcProvider(`https://${RPC_HOST}`, undefined, { staticNetwork: true });
+  const contract = new Contract(CONTRACT_ADDRESS, HELP_ABI, provider);
+  const total = Number(await contract.getHelpCount());
+
+  let data = [];
+  if (total > 0) {
+    const rows = await contract.getHelps(0, Math.min(total, HELP_MAX));
+    data = rows.map(h => ({
+      helperName: h.helperName,
+      catId: h.catId,
+      action: h.action,
+      message: h.message,
+      proofHash: h.proofHash,
+      timestamp: Number(h.timestamp),
+    }));
+  }
+
+  helpsCache = { at: now, data, total };
+  return helpsCache;
+}
 
 // 证书文件（与本文件同目录）
 const CERT_FILE = path.join(__dirname, 'www.lovepet.bond.pem');
@@ -122,6 +163,45 @@ async function allCatPhotos() {
     if (photos.length) out[cat.catId] = photos;
   }));
   return out;
+}
+
+async function readLocalJson(name) {
+  return JSON.parse(await fs.promises.readFile(path.join(__dirname, name), 'utf8'));
+}
+
+async function handleApi(req, res, urlObj) {
+  const p = urlObj.pathname;
+  if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method Not Allowed' });
+
+  try {
+    if (p === '/api/cat-photos') {
+      return sendJson(res, 200, await allCatPhotos());
+    }
+    if (p === '/api/cats') {
+      return sendJson(res, 200, await readLocalJson('cats.json'));
+    }
+    if (p === '/api/volunteers') {
+      return sendJson(res, 200, await readLocalJson('volunteers.json'));
+    }
+    if (p === '/api/videos') {
+      const list = await readLocalJson('videos.json');
+      const catId = urlObj.searchParams.get('catId');
+      return sendJson(res, 200, catId ? list.filter(v => v.catId === catId) : list);
+    }
+    if (p === '/api/helps') {
+      const cache = await readHelps();
+      const catId = urlObj.searchParams.get('catId');
+      const list = catId ? cache.data.filter(h => h.catId === catId) : cache.data;
+      return sendJson(res, 200, { total: cache.total, helps: list });
+    }
+    return sendJson(res, 404, { error: '接口不存在' });
+  } catch (e) {
+    console.error('接口读取失败:', e.message);
+    const missingEthers = /Cannot find module 'ethers'/.test(e.message);
+    return sendJson(res, missingEthers ? 503 : 502, {
+      error: missingEthers ? '服务端缺少 ethers 依赖，请先执行 npm install' : '数据读取失败',
+    });
+  }
 }
 
 function clientIp(req) {
@@ -414,25 +494,23 @@ function handleRequest(req, res) {
   }
 
   // ──────────────────────
-  // 2. 投稿接口
+  // 2. 接口（投稿 + 只读数据）
   // ──────────────────────
-  if (req.method === 'POST' && req.url === '/api/submit') {
+  let urlObj;
+  try { urlObj = new URL(req.url, 'http://localhost'); } catch { return sendJson(res, 400, { error: '请求地址不正确' }); }
+
+  if (req.method === 'POST' && urlObj.pathname === '/api/submit') {
     handleSubmit(req, res);
     return;
   }
 
-  // ──────────────────────
-  // 3. 猫咪照片列表（每只猫文件夹里的图）
-  // ──────────────────────
-  if (req.method === 'GET' && req.url === '/api/cat-photos') {
-    allCatPhotos()
-      .then(map => sendJson(res, 200, map))
-      .catch(() => sendJson(res, 500, { error: '读取照片失败' }));
+  if (urlObj.pathname.startsWith('/api/')) {
+    handleApi(req, res, urlObj);
     return;
   }
 
   // ──────────────────────
-  // 4. 静态文件服务
+  // 3. 静态文件服务
   // ──────────────────────
   let urlPath = req.url.split('?')[0];
   try { urlPath = decodeURIComponent(urlPath); } catch { /* 保留原始路径 */ }

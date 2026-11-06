@@ -30,3 +30,6 @@ receive money/
 .claude/
 *.bak
 *.bak2
+
+# 依赖
+node_modules/
