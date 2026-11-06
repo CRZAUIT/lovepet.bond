@@ -2,9 +2,31 @@
 deploy.tar.gz
 *.tar.gz
 
+# 投稿数据（含联系方式，不入库）
+submissions.json
+
+# 后台密码（不入库）
+admin-password.txt
+
 # 个人文档（不入库）
 memory.md
 learning_path.md
 obsidian_guide.md
 summer_plan.md
 阿里云部署教程.md
+userquestions/
+
+# 捐赠功能已下线（含捐赠人信息，不入库）
+donations.json
+alipay.jpg
+weixin.jpg
+receive money/
+
+# 证书私钥（不入库）
+*.key
+*.pem
+
+# 本地配置与备份文件
+.claude/
+*.bak
+*.bak2

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>志愿者 · 喵链</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.bootcdn.net/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+
+  <header style="padding-bottom:8px">
+    <a class="back-link" href="index.html">← 返回首页</a>
+  </header>
+
+  <div id="loading" class="empty">
+    <div class="spinner"></div>
+    <p>正在加载志愿者档案...</p>
+  </div>
+
+  <div id="notFound" class="empty" style="display:none">
+    <p>没有找到这位志愿者</p>
+  </div>
+
+  <div id="profile" class="cat-profile" style="display:none">
+    <div id="volPhoto" class="cat-photo-lg">👤</div>
+    <div class="cat-detail">
+      <h1 id="volName">--</h1>
+      <div class="loc" id="volLoc"></div>
+      <p class="desc desc-quote" id="volDesc"></p>
+    </div>
+  </div>
+
+  <section id="catsSection" style="display:none">
+    <div class="section-header">
+      <h2>TA 帮助过的小动物</h2>
+      <span class="count" id="catBadge">0</span>
+    </div>
+    <div id="catWall" class="cat-wall"></div>
+  </section>
+
+  <footer>
+    <p>数据来源：Polygon Amoy 测试链 · <a href="index.html">返回首页</a></p>
+    <p class="brand-line"><span class="brand-cn">乐盼</span> <span class="brand-sep">|</span> l<span class="brand-heart">♥</span>vepet</p>
+  </footer>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+const volunteerId = new URLSearchParams(window.location.search).get('volunteerId');
+
+async function main() {
+  if (!volunteerId) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('notFound').style.display = '';
+    return;
+  }
+
+  // 链下档案
+  let volunteers = [];
+  try { volunteers = await loadVolunteers(); } catch { /* ignore */ }
+  let cats = [];
+  try { cats = await loadCats(); } catch { /* ignore */ }
+
+  const v = volunteers.find(x => x.volunteerId === volunteerId) || null;
+
+  document.getElementById('loading').style.display = 'none';
+  if (!v) {
+    document.getElementById('notFound').style.display = '';
+    return;
+  }
+
+  document.title = v.name + ' · 喵链';
+  document.getElementById('profile').style.display = 'flex';
+  document.getElementById('volName').textContent = v.name;
+  document.getElementById('volLoc').textContent = v.location || '';
+  document.getElementById('volDesc').textContent = v.description || '';
+  if (v.photo) {
+    const img = document.createElement('img');
+    img.className = 'cat-photo-lg';
+    img.src = v.photo;
+    img.alt = v.name;
+    document.getElementById('volPhoto').replaceWith(img);
+  }
+
+  // 链上：认领属于 TA 的记录
+  let helps = [];
+  try {
+    const contract = await getContract();
+    const total = Number(await contract.getHelpCount());
+    if (total > 0) {
+      const all = await contract.getHelps(0, Math.min(total, 200));
+      helps = helpsForVolunteer(v, all);
+    }
+  } catch { /* 读不到就当作没有记录 */ }
+
+  const catIds = [...new Set(helps.map(h => h.catId).filter(Boolean))];
+  const byId = {};
+  cats.forEach(c => { byId[c.catId] = c; });
+
+  document.getElementById('catsSection').style.display = '';
+  document.getElementById('catBadge').textContent = catIds.length;
+
+  const wall = document.getElementById('catWall');
+  if (!catIds.length) {
+    wall.innerHTML = '<div class="empty"><p>TA 还没有帮助记录</p></div>';
+    return;
+  }
+  wall.innerHTML = catIds.map(id => {
+    const c = byId[id];
+    const name = c ? c.name : id;
+    const photo = (c && c.photo)
+      ? `<img class="cat-photo" src="${escapeHtml(c.photo)}" alt="${escapeHtml(name)}">`
+      : `<div class="cat-photo">🐱</div>`;
+    return `<a class="cat-card" href="cat.html?catId=${encodeURIComponent(id)}">
+      ${photo}
+      <div class="cat-info">
+        <div class="cat-name">${escapeHtml(name)}</div>
+      </div>
+    </a>`;
+  }).join('');
+}
+
+main();
+</script>
+<script>
+var _hmt = _hmt || [];
+(function() {
+  var hm = document.createElement("script");
+  hm.src = "https://hm.baidu.com/hm.js?e10a882b2c229fad91d39b699cc38159";
+  var s = document.getElementsByTagName("script")[0];
+  s.parentNode.insertBefore(hm, s);
+})();
+</script>
+</body>
+</html>

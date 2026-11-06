@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>猫咪档案 · 喵链</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.bootcdn.net/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+
+  <header style="padding-bottom:8px">
+    <a class="back-link" href="index.html">← 返回小猫墙</a>
+  </header>
+
+  <div id="loading" class="empty">
+    <div class="spinner"></div>
+    <p>正在加载猫咪档案...</p>
+  </div>
+
+  <div id="notFound" class="empty" style="display:none">
+    <p>没有找到这只猫</p>
+  </div>
+
+  <div id="profile" class="cat-profile" style="display:none">
+    <div id="catPhoto" class="cat-photo-lg">🐱</div>
+    <div class="cat-detail">
+      <h1 id="catName">--</h1>
+      <div class="loc" id="catLoc"></div>
+      <p class="desc" id="catDesc"></p>
+      <a class="entry-btn" id="submitLink" href="submit.html">我也帮过这只猫 →</a>
+    </div>
+  </div>
+
+  <section id="videosSection" style="display:none">
+    <div class="section-header">
+      <h2>日常视频</h2>
+      <span class="count" id="videoBadge">0</span>
+    </div>
+    <div id="videoWall" class="video-wall"></div>
+  </section>
+
+  <section id="helpsSection" style="display:none">
+    <div class="section-header">
+      <h2>这只猫的帮助记录</h2>
+      <span class="count" id="helpBadge">0</span>
+    </div>
+    <div class="table-wrap">
+      <div id="helpLoading" class="empty">
+        <div class="spinner"></div>
+        <p>正在从链上读取数据...</p>
+      </div>
+      <div id="helpError" class="error-state" style="display:none">
+        <span class="icon">!</span>
+        <p id="helpErrorMsg">读取失败</p>
+        <p class="hint">请检查网络连接后刷新页面</p>
+      </div>
+      <div id="helpContent" style="display:none">
+        <table>
+          <thead>
+            <tr>
+              <th>志愿者</th>
+              <th>做了什么</th>
+              <th>留言</th>
+              <th>时间</th>
+              <th>凭证</th>
+            </tr>
+          </thead>
+          <tbody id="helpBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>数据来源：Polygon Amoy 测试链 · <a href="index.html">返回首页</a></p>
+    <p class="brand-line"><span class="brand-cn">乐盼</span> <span class="brand-sep">|</span> l<span class="brand-heart">♥</span>vepet</p>
+  </footer>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+const catId = new URLSearchParams(window.location.search).get('catId');
+
+async function main() {
+  if (!catId) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('notFound').style.display = '';
+    return;
+  }
+
+  // 链下档案
+  let cat = null;
+  try {
+    const cats = await loadCats();
+    cat = cats.find(c => c.catId === catId) || null;
+  } catch { /* ignore */ }
+
+  document.getElementById('loading').style.display = 'none';
+  if (!cat) {
+    document.getElementById('notFound').style.display = '';
+    return;
+  }
+
+  document.title = cat.name + ' · 喵链';
+  document.getElementById('profile').style.display = 'flex';
+  document.getElementById('catName').textContent = cat.name;
+  document.getElementById('catLoc').textContent = cat.location || '';
+  document.getElementById('catDesc').textContent = cat.description || '';
+  document.getElementById('submitLink').href = 'submit.html?catId=' + encodeURIComponent(catId);
+  if (cat.photo) {
+    const img = document.createElement('img');
+    img.className = 'cat-photo-lg';
+    img.src = cat.photo;
+    img.alt = cat.name;
+    document.getElementById('catPhoto').replaceWith(img);
+  }
+
+  // 链下日常视频（不上链）
+  let videos = [];
+  try {
+    videos = (await loadVideos()).filter(v => v.catId === catId);
+  } catch { /* 没有清单就跳过 */ }
+  renderVideos(videos);
+
+  // 链上帮助记录
+  document.getElementById('helpsSection').style.display = '';
+  let helps = [];
+  try {
+    const contract = await getContract();
+    const total = Number(await contract.getHelpCount());
+    if (total > 0) {
+      const all = await contract.getHelps(0, Math.min(total, 200));
+      helps = all.filter(h => h.catId === catId);
+    }
+  } catch (e) {
+    document.getElementById('helpLoading').style.display = 'none';
+    document.getElementById('helpError').style.display = '';
+    if (e.message) document.getElementById('helpErrorMsg').textContent = e.message;
+    return;
+  }
+  renderHelps(helps);
+}
+
+function renderVideos(videos) {
+  const section = document.getElementById('videosSection');
+  if (!videos.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  document.getElementById('videoBadge').textContent = videos.length;
+
+  const wall = document.getElementById('videoWall');
+  wall.innerHTML = videos.map(v => `
+    <div class="video-card" data-src="${escapeHtml(v.src)}">
+      <div class="video-frame">
+        <img class="video-poster" src="${escapeHtml(v.poster || '')}" alt="${escapeHtml(v.title || '')}">
+        <span class="video-play">▶</span>
+      </div>
+      <div class="video-info">
+        <div class="video-title">${escapeHtml(v.title || '日常记录')}</div>
+        <div class="video-meta">
+          <span class="video-tag">日常</span>
+          <span>${escapeHtml(v.date || '')}</span>
+        </div>
+      </div>
+    </div>`).join('');
+
+  wall.querySelectorAll('.video-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const frame = card.querySelector('.video-frame');
+      if (frame.querySelector('video')) return;
+      const video = document.createElement('video');
+      video.src = card.dataset.src;
+      video.controls = true;
+      video.autoplay = true;
+      video.playsInline = true;
+      frame.innerHTML = '';
+      frame.appendChild(video);
+    });
+  });
+}
+
+function renderHelps(helps) {
+  document.getElementById('helpLoading').style.display = 'none';
+  document.getElementById('helpBadge').textContent = helps.length;
+  const tbody = document.getElementById('helpBody');
+  tbody.innerHTML = '';
+
+  if (!helps.length) {
+    document.getElementById('helpContent').style.display = '';
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty"><p>这只猫还没有帮助记录</p></div></td></tr>';
+    return;
+  }
+
+  document.getElementById('helpContent').style.display = '';
+  [...helps].reverse().forEach(h => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(h.helperName) || '匿名'}</td>
+      <td>${escapeHtml(h.action) || '-'}</td>
+      <td><span class="message" title="${escapeHtml(h.message)}">${escapeHtml(h.message) || '-'}</span></td>
+      <td class="timestamp">${formatTime(h.timestamp)}</td>
+      <td>${h.proofHash ? `<a class="proof-link" href="${IPFS_GATEWAY}${encodeURIComponent(h.proofHash)}" target="_blank" rel="noopener">查看凭证</a>` : '-'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+main();
+</script>
+<script>
+var _hmt = _hmt || [];
+(function() {
+  var hm = document.createElement("script");
+  hm.src = "https://hm.baidu.com/hm.js?e10a882b2c229fad91d39b699cc38159";
+  var s = document.getElementsByTagName("script")[0];
+  s.parentNode.insertBefore(hm, s);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>喵链后台</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  body { background: #fdf8f0; color: #4a3c31; }
+  .admin-wrap { max-width: 920px; margin: 0 auto; padding: 28px 18px 64px; }
+
+  .admin-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 0 0 20px; text-align: left;
+  }
+  .admin-head h1 { font-size: 1.4rem; margin: 0 0 4px; color: #4a3c31; }
+  .admin-head p { margin: 0; color: #a89a8a; font-size: 0.82rem; }
+
+  .admin-status { font-size: 0.85rem; color: #a89a8a; margin: 10px 0 18px; }
+  .admin-status.error { color: #c0563f; }
+
+  .sub-card {
+    display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 18px;
+    background: #fffdf9; border: 1px solid #f0e4d4; border-radius: 16px;
+    padding: 16px; margin-bottom: 16px;
+    box-shadow: 0 8px 20px rgba(120, 90, 60, 0.07);
+  }
+  .sub-photo {
+    width: 100%; aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden;
+    background: #fdf1e3; display: flex; align-items: center; justify-content: center;
+    font-size: 2.6rem;
+  }
+  .sub-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .sub-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+  .sub-title strong { font-size: 1.05rem; color: #4a3c31; }
+  .tag {
+    font-size: 0.7rem; padding: 2px 8px; border-radius: 99px;
+    background: #fdeee2; color: #b45f2a;
+  }
+  .sub-meta { font-size: 0.76rem; color: #b3a491; }
+  .sub-contact { margin-top: 8px; font-size: 0.88rem; color: #4a3c31; }
+  .sub-byline { margin-top: 6px; font-size: 0.84rem; color: #7a6a58; }
+  .sub-message {
+    margin-top: 8px; font-size: 0.92rem; color: #5f5142;
+    background: #fdf6ec; border-radius: 10px; padding: 10px 12px; white-space: pre-wrap;
+  }
+  .sub-tags { margin-top: 8px; font-size: 0.72rem; color: #b3a491; }
+
+  .sub-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .btn {
+    border: 0; border-radius: 99px; padding: 8px 16px; font-size: 0.84rem;
+    cursor: pointer; font-family: inherit; transition: opacity 0.2s;
+  }
+  .btn:disabled { opacity: 0.55; cursor: default; }
+  .btn-primary { background: #d9743a; color: #fff; }
+  .btn-primary:hover:not(:disabled) { opacity: 0.88; }
+  .btn-danger { background: #fff; color: #b4513d; border: 1px solid #eccfc7; }
+  .btn-danger:hover:not(:disabled) { background: #fdf1ee; }
+  .btn-plain { background: #fff; color: #7a6a58; border: 1px solid #eadfce; }
+  .btn-link { border: 0; background: none; color: #d9743a; cursor: pointer; font-size: 0.78rem; padding: 0 4px; }
+
+  .empty { text-align: center; color: #b3a491; padding: 56px 16px; font-size: 0.9rem; }
+
+  #cardStage { position: fixed; left: -99999px; top: 0; pointer-events: none; }
+  .card-export { width: 384px; padding: 32px; background: #fdf8f0; }
+  .card-export .preview-card { margin: 0 auto; }
+
+  @media (max-width: 620px) {
+    .sub-card { grid-template-columns: 1fr; }
+    .sub-photo { max-width: 150px; }
+    .admin-head { align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+<div class="admin-wrap">
+  <header class="admin-head">
+    <div>
+      <h1>喵链后台</h1>
+      <p>投稿审核 · 仅管理员可见</p>
+    </div>
+    <button type="button" class="btn btn-plain" id="refreshBtn">刷新</button>
+  </header>
+
+  <div class="admin-status" id="statusEl">正在读取投稿…</div>
+  <div id="listEl"></div>
+</div>
+
+<div id="cardStage" aria-hidden="true"></div>
+
+<template id="cardTpl">
+  <div class="card-export">
+    <div class="preview-card" data-theme="cream">
+      <div class="preview-tape"></div>
+      <span class="preview-sticker s1"></span>
+      <span class="preview-sticker s2"></span>
+      <span class="preview-sticker s3"></span>
+      <span class="preview-sticker s4"></span>
+
+      <div class="preview-photo-frame">
+        <div class="preview-photo"></div>
+      </div>
+
+      <div class="preview-caption">
+        <div class="preview-name"><span data-f="name"></span> <span class="preview-paw">🐾</span></div>
+        <div class="preview-underline"></div>
+        <div class="preview-byline" data-f="byline"></div>
+        <div class="preview-msg" data-f="msg"></div>
+        <div class="preview-foot">
+          <span data-f="date"></span>
+          <span class="preview-stamp" data-f="stamp">待存证</span>
+          <span class="preview-divider"></span>
+          <span class="preview-wordmark">l<span class="wm-heart">♥</span>vepet</span>
+        </div>
+        <div class="preview-brand">喵链</div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script src="vendor/html-to-image.js"></script>
+<script>
+const API = '/api/miao-admin-7f3k2/submissions';
+const STICKERS = {
+  flower: ['🌼', '✨', '🐾', '💛'],
+  sakura: ['🌸', '🍃', '🐾', '💗'],
+  star: ['⭐', '🌙', '🐾', '💫'],
+  none: ['', '', '', ''],
+};
+const THEME_NAMES = { cream: '奶油', mint: '薄荷', sakura: '樱花', night: '星夜' };
+const PACK_NAMES = { flower: '小花', sakura: '樱花', star: '星星', none: '不加' };
+
+const listEl = document.getElementById('listEl');
+const statusEl = document.getElementById('statusEl');
+const refreshBtn = document.getElementById('refreshBtn');
+const cardStage = document.getElementById('cardStage');
+
+let records = [];
+const catsById = {};
+
+function plainName(name) {
+  return String(name || '').replace(/[（(][^）)]*[）)]/g, '').trim();
+}
+
+function fmtTime(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return iso || '';
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function fmtCardDate(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function statusLabel(s) {
+  return s === 'verified' ? '已存证' : s === 'rejected' ? '已拒绝' : '待审核';
+}
+
+function photoSrc(r) {
+  if (r.photo && /^cats\//.test(r.photo)) return r.photo;
+  const cat = catsById[r.catId];
+  return cat && cat.photo ? cat.photo : '';
+}
+
+async function loadCats() {
+  try {
+    const res = await fetch('cats.json', { cache: 'no-store' });
+    if (!res.ok) return;
+    const list = await res.json();
+    list.forEach(c => { catsById[c.catId] = c; });
+  } catch { /* 没有档案也不影响查看投稿 */ }
+}
+
+async function loadRecords() {
+  statusEl.textContent = '正在读取投稿…';
+  statusEl.classList.remove('error');
+  try {
+    const res = await fetch(API, { cache: 'no-store' });
+    if (res.status === 401) throw new Error('登录已失效，请刷新页面重新输入密码');
+    if (!res.ok) throw new Error('读取投稿失败');
+    records = await res.json();
+    records.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+    render();
+  } catch (e) {
+    statusEl.textContent = e.message || '读取投稿失败';
+    statusEl.classList.add('error');
+  }
+}
+
+function render() {
+  listEl.innerHTML = '';
+  statusEl.textContent = records.length ? `共 ${records.length} 条投稿` : '还没有投稿';
+  if (!records.length) {
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = '暂时没有待审核的投稿 🐾';
+    listEl.appendChild(empty);
+    return;
+  }
+  records.forEach(r => listEl.appendChild(renderItem(r)));
+}
+
+function renderItem(r) {
+  const card = document.createElement('article');
+  card.className = 'sub-card';
+
+  const photoWrap = document.createElement('div');
+  photoWrap.className = 'sub-photo';
+  const src = photoSrc(r);
+  if (src) {
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = plainName(r.catName) || '猫咪';
+    img.loading = 'lazy';
+    photoWrap.appendChild(img);
+  } else {
+    photoWrap.textContent = '🐾';
+  }
+
+  const info = document.createElement('div');
+
+  const title = document.createElement('div');
+  title.className = 'sub-title';
+  const nameEl = document.createElement('strong');
+  nameEl.textContent = plainName(r.catName) || '神秘毛孩子';
+  const tag = document.createElement('span');
+  tag.className = 'tag';
+  tag.textContent = statusLabel(r.status);
+  title.append(nameEl, tag);
+
+  const meta = document.createElement('div');
+  meta.className = 'sub-meta';
+  meta.textContent = `${fmtTime(r.submittedAt)} · ${r.catId || 'other'}${r.meetPlace ? ' · ' + r.meetPlace : ''}`;
+
+  const contact = document.createElement('div');
+  contact.className = 'sub-contact';
+  contact.textContent = '联系：' + (r.contact || '—');
+  if (r.contact) {
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'btn-link';
+    copyBtn.textContent = '复制';
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(r.contact);
+        copyBtn.textContent = '已复制';
+      } catch {
+        copyBtn.textContent = '复制失败';
+      }
+      setTimeout(() => { copyBtn.textContent = '复制'; }, 1500);
+    });
+    contact.appendChild(copyBtn);
+  }
+
+  const byline = document.createElement('div');
+  byline.className = 'sub-byline';
+  byline.textContent = `${r.name || '匿名'} · ${r.action || '—'}`;
+
+  const message = document.createElement('p');
+  message.className = 'sub-message';
+  message.textContent = r.message || '';
+
+  const tags = document.createElement('div');
+  tags.className = 'sub-tags';
+  tags.textContent = `配色：${THEME_NAMES[r.cardTheme] || r.cardTheme || '奶油'} · 贴纸：${PACK_NAMES[r.stickerPack] || r.stickerPack || '小花'} · IP：${r.ip || '—'}`;
+
+  const actions = document.createElement('div');
+  actions.className = 'sub-actions';
+
+  const dlBtn = document.createElement('button');
+  dlBtn.type = 'button';
+  dlBtn.className = 'btn btn-primary';
+  dlBtn.textContent = '下载卡片';
+  dlBtn.addEventListener('click', () => downloadCard(r, dlBtn));
+
+  const delBtn = document.createElement('button');
+  delBtn.type = 'button';
+  delBtn.className = 'btn btn-danger';
+  delBtn.textContent = '删除';
+  delBtn.addEventListener('click', () => removeRecord(r, delBtn));
+
+  actions.append(dlBtn, delBtn);
+  info.append(title, meta, contact, byline, message, tags, actions);
+  card.append(photoWrap, info);
+  return card;
+}
+
+function buildCard(r) {
+  const tpl = document.getElementById('cardTpl');
+  const node = tpl.content.firstElementChild.cloneNode(true);
+  const cardEl = node.querySelector('.preview-card');
+  cardEl.dataset.theme = THEME_NAMES[r.cardTheme] ? r.cardTheme : 'cream';
+
+  const emojis = STICKERS[r.stickerPack] || STICKERS.flower;
+  node.querySelectorAll('.preview-sticker').forEach((el, i) => {
+    el.textContent = emojis[i];
+  });
+
+  const photoEl = node.querySelector('.preview-photo');
+  const src = photoSrc(r);
+  if (src) {
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = plainName(r.catName) || '猫咪';
+    photoEl.appendChild(img);
+  } else {
+    photoEl.textContent = '🐾';
+  }
+
+  node.querySelector('[data-f="name"]').textContent = plainName(r.catName) || '神秘毛孩子';
+  node.querySelector('[data-f="byline"]').textContent =
+    '♡ ' + (r.name || '善良的你') + (r.action ? ' ' + r.action : '');
+  node.querySelector('[data-f="msg"]').textContent = r.message || '';
+  node.querySelector('[data-f="date"]').textContent = fmtCardDate(r.submittedAt);
+  node.querySelector('[data-f="stamp"]').textContent = r.status === 'verified' ? '已存证' : '待存证';
+  return node;
+}
+
+async function downloadCard(r, btn) {
+  if (!window.htmlToImage) {
+    alert('卡片组件加载失败，请刷新页面重试');
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '生成中…';
+  try {
+    const node = buildCard(r);
+    cardStage.innerHTML = '';
+    cardStage.appendChild(node);
+
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    await Promise.all([...node.querySelectorAll('img')].map(img => {
+      if (img.complete) return Promise.resolve();
+      return new Promise(resolve => { img.onload = img.onerror = resolve; });
+    }));
+
+    const dataUrl = await window.htmlToImage.toPng(node, {
+      pixelRatio: 1080 / node.offsetWidth,
+      backgroundColor: '#fdf8f0',
+      cacheBust: true,
+    });
+
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `miao-card-${r.id}.png`;
+    a.click();
+  } catch (e) {
+    console.error('生成卡片失败:', e);
+    alert('生成卡片失败，请用 Chrome 或 Edge 再试');
+  } finally {
+    cardStage.innerHTML = '';
+    btn.disabled = false;
+    btn.textContent = '下载卡片';
+  }
+}
+
+async function removeRecord(r, btn) {
+  if (!confirm(`确定删除「${plainName(r.catName) || '这条投稿'}」？删除后无法恢复。`)) return;
+  btn.disabled = true;
+  btn.textContent = '删除中…';
+  try {
+    const res = await fetch(`${API}/${encodeURIComponent(r.id)}`, { method: 'DELETE', cache: 'no-store' });
+    if (!res.ok) throw new Error(res.status === 401 ? '登录已失效，请刷新页面' : '删除失败');
+    records = records.filter(x => x.id !== r.id);
+    render();
+  } catch (e) {
+    alert(e.message);
+    btn.disabled = false;
+    btn.textContent = '删除';
+  }
+}
+
+refreshBtn.addEventListener('click', loadRecords);
+
+(async () => {
+  await loadCats();
+  await loadRecords();
+})();
+</script>
+</body>
+</html>

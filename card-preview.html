@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>分享卡片 · 设计稿</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    min-height:100vh;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 0%, #fff4e2 0%, #f3efe9 70%);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC",sans-serif;
+    padding:32px;
+  }
+  /* 截图区域：屏幕透明（显示页面渐变）；导出时由 JS 垫一层暖底 */
+  .card-stage{
+    padding:24px;
+  }
+  /* 操作按钮 */
+  .actions{display:flex;gap:12px;}
+  .actions button{
+    font:inherit;font-size:14px;font-weight:600;
+    padding:10px 22px;border-radius:100px;border:none;cursor:pointer;
+    background:#d9743a;color:#fff;transition:filter .2s;
+  }
+  .actions button:hover{filter:brightness(1.06);}
+  .actions button.ghost{background:#fff;color:#d9743a;border:1px solid #e6d5c4;}
+  .status{margin-top:12px;font-size:13px;color:#9a9186;min-height:18px;}
+  .hand{font-family:"STKaiti","KaiTi","楷体",serif;}
+
+  .card{
+    position:relative;
+    width:320px;
+    background:#fffdf7;
+    border-radius:18px;
+    padding:20px 18px 24px;
+    /* 投影收窄，刚好装进 24px 留白里：留立体感、又不留多余暖色边 */
+    box-shadow:0 11px 22px rgba(80,55,30,.18), 0 3px 8px rgba(80,55,30,.08);
+    transform:rotate(-2deg);
+  }
+
+  /* 顶部和纸胶带 */
+  .tape{
+    position:absolute;top:-12px;left:50%;
+    width:112px;height:26px;
+    transform:translateX(-50%) rotate(-3deg);
+    background:
+      repeating-linear-gradient(45deg, rgba(255,255,255,.55) 0 6px, transparent 6px 12px),
+      rgba(247,180,120,.55);
+    border-radius:2px;
+    box-shadow:0 2px 4px rgba(0,0,0,.06);
+  }
+
+  /* 照片：像贴上去的一张小相纸 */
+  .photo-frame{
+    background:#fff;
+    padding:8px;
+    border-radius:14px;
+    box-shadow:0 8px 18px rgba(80,55,30,.16);
+    transform:rotate(1.5deg);
+  }
+  .photo-frame img{
+    width:100%;aspect-ratio:1/1;object-fit:cover;
+    border-radius:8px;display:block;
+  }
+
+  .caption{padding:20px 8px 0;text-align:center;}
+  .cat-name{font-size:30px;font-weight:700;color:#4a4238;letter-spacing:.06em;}
+  .cat-name .paw{font-size:18px;}
+  .underline{
+    width:120px;height:8px;margin:6px auto 0;
+    background:radial-gradient(circle, #f7c79e 1.6px, transparent 1.8px) 0 0/10px 8px repeat-x;
+  }
+  .byline{
+    display:inline-block;margin-top:12px;
+    font-size:13px;font-weight:600;color:#d9743a;
+    background:#fdeee2;border-radius:100px;padding:4px 14px;
+  }
+  .msg{margin-top:14px;font-size:17px;color:#6b6152;line-height:1.65;}
+  .foot{
+    margin-top:18px;
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    font-size:11px;color:#b3ab9c;
+  }
+  .stamp{
+    display:inline-flex;align-items:center;gap:4px;
+    background:#e9f5ee;color:#2d6a4f;
+    font-size:10px;font-weight:700;padding:3px 9px;border-radius:100px;
+  }
+  /* lovepet 小字标：o=爱心，e=猫耳，右上角 r */
+  .wordmark{
+    display:inline-flex;align-items:baseline;
+    font-weight:700;letter-spacing:.03em;
+    color:#c3bbac;
+  }
+  .wm-heart{color:#e07a5f;margin:0 .5px;}
+  .divider{width:1px;height:10px;background:#ded8cc;border-radius:1px;}
+  /* 品牌落款 */
+  .brand{
+    margin-top:12px;text-align:center;
+    font-size:12px;font-weight:600;
+    letter-spacing:.35em;text-indent:.35em;
+    color:#c3bbac;
+  }
+
+  /* 贴纸 */
+  .sticker{
+    position:absolute;font-size:22px;line-height:1;
+    filter:drop-shadow(0 2px 2px rgba(0,0,0,.12));
+  }
+  .s1{top:-14px;left:-10px;transform:rotate(-18deg);}
+  .s2{top:66px;right:-12px;transform:rotate(14deg);}
+  .s3{bottom:54px;left:-12px;transform:rotate(-10deg);}
+  .s4{bottom:-10px;right:-8px;transform:rotate(12deg);}
+</style>
+</head>
+<body>
+  <div class="card-stage" id="cardStage">
+  <div class="card">
+    <div class="tape"></div>
+    <div class="sticker s1">🌼</div>
+    <div class="sticker s2">✨</div>
+    <div class="sticker s3">🐾</div>
+    <div class="sticker s4">💛</div>
+
+    <div class="photo-frame">
+      <img src="cats/小迷糊/小迷糊的profile.jpg" alt="小迷糊">
+    </div>
+
+    <div class="caption">
+      <div class="cat-name hand">小迷糊 <span class="paw">🐾</span></div>
+      <div class="underline"></div>
+      <div class="byline hand">♡ 小赵 投喂</div>
+      <div class="msg hand">“今天它超粘人，蹭了我好久～”</div>
+      <div class="foot">
+        <span>2026-10-15</span>
+        <span class="stamp">✓ 已存证</span>
+        <span class="divider"></span>
+        <span class="wordmark">l<span class="wm-heart">♥</span>vepet</span>
+      </div>
+      <div class="brand">喵链</div>
+    </div>
+  </div>
+  </div>
+
+  <div class="actions">
+    <button id="saveBtn">保存图片</button>
+    <button id="copyBtn" class="ghost">复制图片</button>
+  </div>
+  <p class="status" id="status"></p>
+
+  <script src="https://cdn.bootcdn.net/ajax/libs/html-to-image/1.11.11/html-to-image.js"></script>
+  <script>
+  const stage = document.getElementById('cardStage');
+  const statusEl = document.getElementById('status');
+  // 导出时垫一层暖底（避免透明变黑），暖底范围由 .card-stage 的 24px 留白决定
+  const opts = { pixelRatio: 2, cacheBust: true, backgroundColor: '#f4eee3' };
+
+  function setStatus(t){ statusEl.textContent = t; }
+
+  document.getElementById('saveBtn').onclick = async () => {
+    setStatus('生成中…');
+    try {
+      const dataUrl = await htmlToImage.toPng(stage, opts);
+      const a = document.createElement('a');
+      a.download = '喵链-卡片.png';
+      a.href = dataUrl;
+      a.click();
+      setStatus('已保存到「下载」文件夹 ✓');
+    } catch (e) {
+      setStatus('生成失败：' + e.message);
+    }
+  };
+
+  document.getElementById('copyBtn').onclick = async () => {
+    if (!navigator.clipboard || !window.ClipboardItem) {
+      setStatus('这个浏览器不支持复制，请用「保存图片」');
+      return;
+    }
+    setStatus('生成中…');
+    try {
+      const blob = await htmlToImage.toBlob(stage, opts);
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      setStatus('已复制，去微信里粘贴即可 ✓');
+    } catch (e) {
+      setStatus('复制失败（可能不是 HTTPS），请用「保存图片」');
+    }
+  };
+  </script>
+</body>
+</html>
